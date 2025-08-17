@@ -1,6 +1,8 @@
+import 'react-native-gesture-handler';
 import 'react-native-get-random-values';
 import React, { useState, useMemo } from 'react';
-import { View, Alert } from 'react-native';
+import { Alert } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BubbleNavigation } from './components/BubbleNavigation';
 import { HomeScreen } from './components/HomeScreen';
 import { PlacesList } from './components/PlacesList';
@@ -248,11 +250,14 @@ export default function App() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       {renderScreen()}
       {!['entry-editor', 'entry-detail'].includes(currentScreen) && (
-        <BubbleNavigation onNavigate={handleNavigate} onCreateEntry={() => handleCreateEntry()} />
+        <BubbleNavigation
+          onNavigate={handleNavigate}
+          onCreateEntry={() => handleCreateEntry()}
+        />
       )}
-    </View>
+    </GestureHandlerRootView>
   );
 }

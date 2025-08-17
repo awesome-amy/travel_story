@@ -17,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Entry, Place } from '../types';
 
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
+
 interface EntryEditorProps {
   entry?: Entry;
   places: Place[];
@@ -102,16 +104,14 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({
           <View>
             <GooglePlacesAutocomplete
               placeholder="Tag location"
-              query={{ key: 'YOUR_GOOGLE_API_KEY', language: 'en' }}
+              query={{ key: GOOGLE_API_KEY, language: 'en' }}
               fetchDetails
               onPress={(data) => {
                 setPlaceId(data.place_id);
                 setLocationText(data.description);
               }}
-              textInputProps={{
-                value: locationText,
-                onChangeText: setLocationText,
-              }}
+              onChangeText={setLocationText}
+              textInputProps={{ value: locationText }}
               styles={{ textInput: styles.input, listView: { zIndex: 10 } }}
             />
 
