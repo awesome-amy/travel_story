@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { View, Alert } from 'react-native';
 import { BubbleNavigation } from './components/BubbleNavigation';
 import { HomeScreen } from './components/HomeScreen';
 import { PlacesList } from './components/PlacesList';
@@ -10,9 +11,17 @@ import { EntryDetail } from './components/EntryDetail';
 import { TrashScreen } from './components/TrashScreen';
 import { mockPlaces, mockEntries } from './data/mockData';
 import { Place, Entry } from './types';
-import { toast, Toaster } from 'sonner@2.0.3';
 
-type Screen = 'home' | 'places' | 'map' | 'place-detail' | 'entry-editor' | 'drafts' | 'entry-detail' | 'trash';
+// Screen type
+export type Screen =
+  | 'home'
+  | 'places'
+  | 'map'
+  | 'place-detail'
+  | 'entry-editor'
+  | 'drafts'
+  | 'entry-detail'
+  | 'trash';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
@@ -23,18 +32,12 @@ export default function App() {
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   // Computed values
-  const draftEntries = useMemo(() => 
-    entries.filter(e => e.status === 'draft'), [entries]
-  );
-  
-  const trashedEntries = useMemo(() => 
-    entries.filter(e => e.status === 'trashed'), [entries]
-  );
+  const draftEntries = useMemo(() => entries.filter(e => e.status === 'draft'), [entries]);
+  const trashedEntries = useMemo(() => entries.filter(e => e.status === 'trashed'), [entries]);
+  const totalDraftCount = draftEntries.length;
+  const totalTrashedCount = trashedEntries.length;
 
-  const totalDraftCount = useMemo(() => draftEntries.length, [draftEntries]);
-  const totalTrashedCount = useMemo(() => trashedEntries.length, [trashedEntries]);
-
-  const getPlaceEntries = (placeId: string) => 
+  const getPlaceEntries = (placeId: string) =>
     entries.filter(e => e.placeId === placeId && e.status !== 'trashed');
 
   // Navigation handlers
@@ -48,11 +51,9 @@ export default function App() {
   const handleCreateEntry = (placeId?: string) => {
     setEditingEntry(null);
     if (placeId && places.find(p => p.id === placeId)) {
-      // Pre-select place if provided
-      setCurrentScreen('entry-editor');
-    } else {
-      setCurrentScreen('entry-editor');
+      setSelectedPlace(places.find(p => p.id === placeId) || null);
     }
+    setCurrentScreen('entry-editor');
   };
 
   const handlePlaceSelect = (place: Place) => {
@@ -71,38 +72,38 @@ export default function App() {
   };
 
   const handleEntryDelete = (entry: Entry) => {
-    if (window.confirm('Are you sure you want to delete this entry? It will be moved to trash.')) {
-      setEntries(prev => prev.map(e => 
-        e.id === entry.id 
-          ? { ...e, status: 'trashed' as const, deletedAt: new Date() }
-          : e
-      ));
-      toast.success('Entry moved to trash');
-    }
+    Alert.alert('Delete entry', 'Are you sure you want to delete this entry?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setEntries(prev =>
+            prev.map(e =>
+              e.id === entry.id
+                ? { ...e, status: 'trashed' as const, deletedAt: new Date() }
+                : e
+            )
+          );
+        },
+      },
+    ]);
   };
 
   const handleEntrySave = (entryData: Partial<Entry>) => {
     if (editingEntry) {
-      // Update existing entry
-      setEntries(prev => prev.map(e => 
-        e.id === editingEntry.id 
-          ? { ...e, ...entryData }
-          : e
-      ));
-      toast.success('Entry updated');
+      setEntries(prev =>
+        prev.map(e => (e.id === editingEntry.id ? { ...e, ...entryData } : e))
+      );
     } else {
-      // Create new entry
       const newEntry: Entry = {
         id: Date.now().toString(),
         createdAt: new Date(),
         updatedAt: new Date(),
-        ...entryData as Required<Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>>
-      };
+        ...entryData,
+      } as Entry;
       setEntries(prev => [...prev, newEntry]);
-      
-      toast.success(entryData.status === 'published' ? 'Entry published' : 'Draft saved');
     }
-    
     setCurrentScreen('home');
     setEditingEntry(null);
   };
@@ -113,19 +114,24 @@ export default function App() {
   };
 
   const handleEntryRestore = (entry: Entry) => {
-    setEntries(prev => prev.map(e => 
-      e.id === entry.id 
-        ? { ...e, status: 'draft' as const, deletedAt: undefined }
-        : e
-    ));
-    toast.success('Entry restored to drafts');
+    setEntries(prev =>
+      prev.map(e =>
+        e.id === entry.id
+          ? { ...e, status: 'draft' as const, deletedAt: undefined }
+          : e
+      )
+    );
   };
 
   const handleEntryPermanentDelete = (entry: Entry) => {
-    if (window.confirm('Are you sure? This will permanently delete the entry and cannot be undone.')) {
-      setEntries(prev => prev.filter(e => e.id !== entry.id));
-      toast.success('Entry permanently deleted');
-    }
+    Alert.alert('Delete permanently', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => setEntries(prev => prev.filter(e => e.id !== entry.id)),
+      },
+    ]);
   };
 
   const handleBack = () => {
@@ -165,7 +171,7 @@ export default function App() {
     switch (currentScreen) {
       case 'home':
         return (
-          <HomeScreen 
+          <HomeScreen
             onNavigate={(screen) => {
               if (screen === 'create') handleCreateEntry();
               else if (screen === 'places') setCurrentScreen('places');
@@ -177,28 +183,17 @@ export default function App() {
             trashedCount={totalTrashedCount}
           />
         );
-      
       case 'places':
         return (
-          <PlacesList 
-            places={places}
-            onBack={handleBack}
-            onPlaceSelect={handlePlaceSelect}
-          />
+          <PlacesList places={places} onBack={handleBack} onPlaceSelect={handlePlaceSelect} />
         );
-      
       case 'map':
         return (
-          <MapView 
-            places={places}
-            onBack={handleBack}
-            onPlaceSelect={handlePlaceSelect}
-          />
+          <MapView places={places} onBack={handleBack} onPlaceSelect={handlePlaceSelect} />
         );
-      
       case 'place-detail':
         return selectedPlace ? (
-          <PlaceDetail 
+          <PlaceDetail
             place={selectedPlace}
             entries={getPlaceEntries(selectedPlace.id)}
             onBack={handleBack}
@@ -208,30 +203,27 @@ export default function App() {
             onViewEntry={handleEntryView}
           />
         ) : null;
-      
       case 'entry-editor':
         return (
-          <EntryEditor 
+          <EntryEditor
             entry={editingEntry || undefined}
             places={places}
             onBack={handleBack}
             onSave={handleEntrySave}
           />
         );
-      
       case 'drafts':
         return (
-          <DraftsList 
+          <DraftsList
             drafts={draftEntries}
             places={places}
             onBack={handleBack}
             onEditDraft={handleDraftEdit}
           />
         );
-      
       case 'entry-detail':
         return selectedEntry ? (
-          <EntryDetail 
+          <EntryDetail
             entry={selectedEntry}
             place={places.find(p => p.id === selectedEntry.placeId)}
             onBack={handleBack}
@@ -239,10 +231,9 @@ export default function App() {
             onDelete={() => handleEntryDelete(selectedEntry)}
           />
         ) : null;
-      
       case 'trash':
         return (
-          <TrashScreen 
+          <TrashScreen
             trashedEntries={trashedEntries}
             places={places}
             onBack={handleBack}
@@ -250,38 +241,17 @@ export default function App() {
             onPermanentDelete={handleEntryPermanentDelete}
           />
         );
-      
       default:
-        return (
-          <HomeScreen 
-            onNavigate={(screen) => {
-              if (screen === 'create') handleCreateEntry();
-              else if (screen === 'places') setCurrentScreen('places');
-              else if (screen === 'map') setCurrentScreen('map');
-              else if (screen === 'drafts') setCurrentScreen('drafts');
-              else if (screen === 'trash') setCurrentScreen('trash');
-            }}
-            draftCount={totalDraftCount}
-            trashedCount={totalTrashedCount}
-          />
-        );
+        return null;
     }
   };
 
   return (
-    <div className="size-full">
+    <View style={{ flex: 1 }}>
       {renderScreen()}
-      
-      {/* Bubble Navigation - only show on main screens */}
       {!['entry-editor', 'entry-detail'].includes(currentScreen) && (
-        <BubbleNavigation 
-          onNavigate={handleNavigate}
-          onCreateEntry={() => handleCreateEntry()}
-        />
+        <BubbleNavigation onNavigate={handleNavigate} onCreateEntry={() => handleCreateEntry()} />
       )}
-      
-      {/* Toast notifications */}
-      <Toaster position="bottom-center" />
-    </div>
+    </View>
   );
 }
