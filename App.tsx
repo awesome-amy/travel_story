@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import React, { useState, useMemo } from 'react';
 import { View, Alert } from 'react-native';
 import { BubbleNavigation } from './components/BubbleNavigation';
