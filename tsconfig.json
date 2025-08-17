@@ -1,0 +1,8 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  },
+  "include": ["App.tsx", "components/HomeScreen.tsx", "components/BubbleNavigation.tsx", "screens/**/*", "data/**/*", "types/**/*"],
+  "exclude": ["node_modules"]
+}
