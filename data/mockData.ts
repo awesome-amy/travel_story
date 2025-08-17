@@ -114,5 +114,18 @@ export const mockEntries: Entry[] = [
     title: 'Central Park Morning',
     body: '# Peaceful Start\n\nMorning jog through Central Park was exactly what I needed.',
     status: 'published'
+  },
+  {
+    id: '6',
+    placeId: '3',
+    location: 'Times Square',
+    country: 'United States',
+    createdAt: new Date('2024-10-21'),
+    updatedAt: new Date('2024-10-21'),
+    type: 'blog',
+    title: 'Trashed Entry',
+    body: 'This entry was deleted.',
+    status: 'trashed',
+    deletedAt: new Date('2024-10-22')
   }
 ];

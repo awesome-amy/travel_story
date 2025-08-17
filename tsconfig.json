@@ -3,6 +3,6 @@
   "compilerOptions": {
     "strict": true
   },
-  "include": ["App.tsx"],
+  "include": ["App.tsx", "components/HomeScreen.tsx", "components/BubbleNavigation.tsx", "screens/**/*", "data/**/*", "types/**/*"],
   "exclude": ["node_modules"]
 }

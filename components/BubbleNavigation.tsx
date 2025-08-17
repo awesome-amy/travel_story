@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { Plus, Home, MapPin, Map } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useRef, useState } from 'react';
+import { View, Pressable, StyleSheet, Animated } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
 interface BubbleNavigationProps {
   onNavigate: (screen: 'home' | 'places' | 'map') => void;
@@ -9,120 +8,116 @@ interface BubbleNavigationProps {
 }
 
 export function BubbleNavigation({ onNavigate, onCreateEntry }: BubbleNavigationProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const anim = useRef(new Animated.Value(0)).current;
 
-  const handleBubbleClick = () => {
-    if (!isExpanded) {
-      setIsExpanded(true);
-    }
+  const toggle = () => {
+    Animated.spring(anim, {
+      toValue: open ? 0 : 1,
+      useNativeDriver: true,
+    }).start();
+    setOpen(!open);
   };
 
-  const handleNavigation = (screen: 'home' | 'places' | 'map') => {
+  const handleNavigate = (screen: 'home' | 'places' | 'map') => {
     onNavigate(screen);
-    setIsExpanded(false);
+    toggle();
   };
 
-  const handleCreateEntry = () => {
+  const handleCreate = () => {
     onCreateEntry();
-    setIsExpanded(false);
+    toggle();
   };
 
-  const handleOverlayClick = () => {
-    setIsExpanded(false);
-  };
+  const homeTranslate = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -80] });
+  const placesTranslate = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -80] });
+  const placesTranslateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -80] });
+  const mapTranslate = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -56] });
+  const mapTranslateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -56] });
 
   return (
-    <>
-      {/* Overlay */}
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/20 z-40"
-            onClick={handleOverlayClick}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Navigation Bubbles */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <AnimatePresence>
-          {isExpanded && (
-            <>
-              {/* Home */}
-              <motion.div
-                initial={{ scale: 0, y: 20 }}
-                animate={{ scale: 1, y: -80 }}
-                exit={{ scale: 0, y: 20 }}
-                transition={{ duration: 0.2, delay: 0.1 }}
-                className="absolute bottom-0 right-0"
-              >
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="w-12 h-12 rounded-full shadow-lg"
-                  onClick={() => handleNavigation('home')}
-                >
-                  <Home className="w-5 h-5" />
-                </Button>
-              </motion.div>
-
-              {/* Places List */}
-              <motion.div
-                initial={{ scale: 0, x: 20 }}
-                animate={{ scale: 1, x: -80 }}
-                exit={{ scale: 0, x: 20 }}
-                transition={{ duration: 0.2, delay: 0.15 }}
-                className="absolute bottom-0 right-0"
-              >
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="w-12 h-12 rounded-full shadow-lg"
-                  onClick={() => handleNavigation('places')}
-                >
-                  <MapPin className="w-5 h-5" />
-                </Button>
-              </motion.div>
-
-              {/* Map */}
-              <motion.div
-                initial={{ scale: 0, x: 20, y: 20 }}
-                animate={{ scale: 1, x: -56, y: -56 }}
-                exit={{ scale: 0, x: 20, y: 20 }}
-                transition={{ duration: 0.2, delay: 0.2 }}
-                className="absolute bottom-0 right-0"
-              >
-                <Button
-                  variant="default"
-                  size="icon"
-                  className="w-12 h-12 rounded-full shadow-lg"
-                  onClick={() => handleNavigation('map')}
-                >
-                  <Map className="w-5 h-5" />
-                </Button>
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Main Bubble */}
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {open && <Pressable style={styles.overlay} onPress={toggle} />}
+      <View style={styles.container} pointerEvents="box-none">
+        <Animated.View
+          style={{
+            position: 'absolute',
+            transform: [{ translateY: homeTranslate }, { scale: anim }],
+          }}
         >
-          <Button
-            variant="default"
-            size="icon"
-            className="w-16 h-16 rounded-full shadow-xl"
-            onClick={isExpanded ? handleCreateEntry : handleBubbleClick}
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </motion.div>
-      </div>
-    </>
+          <Pressable style={styles.smallBubble} onPress={() => handleNavigate('home')}>
+            <Feather name="home" size={20} color="#fff" />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            position: 'absolute',
+            transform: [
+              { translateY: placesTranslate },
+              { translateX: placesTranslateX },
+              { scale: anim },
+            ],
+          }}
+        >
+          <Pressable style={styles.smallBubble} onPress={() => handleNavigate('places')}>
+            <Feather name="map-pin" size={20} color="#fff" />
+          </Pressable>
+        </Animated.View>
+
+        <Animated.View
+          style={{
+            position: 'absolute',
+            transform: [
+              { translateY: mapTranslate },
+              { translateX: mapTranslateX },
+              { scale: anim },
+            ],
+          }}
+        >
+          <Pressable style={styles.smallBubble} onPress={() => handleNavigate('map')}>
+            <Feather name="map" size={20} color="#fff" />
+          </Pressable>
+        </Animated.View>
+
+        <Pressable
+          style={styles.mainBubble}
+          onPress={open ? handleCreate : toggle}
+        >
+          <Feather name="plus" size={24} color="#fff" />
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mainBubble: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+  },
+  smallBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    elevation: 4,
+  },
+});
+
