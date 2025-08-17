@@ -6,12 +6,13 @@ import {
   Switch,
   Text,
   TouchableOpacity,
-  ScrollView,
   Image,
   FlatList,
 } from 'react-native';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import Markdown from 'react-native-markdown-display';
+import DraggableFlatList, {
+  RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Entry, Place } from '../types';
@@ -47,15 +48,26 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({
     }
   };
 
-  const moveMedia = (from: number, to: number) => {
-    if (to < 0 || to >= media.length) return;
-    setMedia(prev => {
-      const arr = [...prev];
-      const [item] = arr.splice(from, 1);
-      arr.splice(to, 0, item);
-      return arr;
-    });
-  };
+  const removeMedia = (index: number) =>
+    setMedia(prev => prev.filter((_, i) => i !== index));
+
+  const renderMediaItem = ({
+    item,
+    index,
+    drag,
+  }: RenderItemParams<string>) => (
+    <View style={styles.mediaItem}>
+      <TouchableOpacity onLongPress={drag} activeOpacity={0.8}>
+        <Image source={{ uri: item }} style={styles.mediaThumb} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteBadge}
+        onPress={() => removeMedia(index)}
+      >
+        <Ionicons name="close" size={14} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
 
   const handleSave = () => {
     onSave({
@@ -71,7 +83,7 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <View style={styles.wrapper}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onBack}>
           <Text style={styles.headerButton}>Cancel</Text>
@@ -81,106 +93,109 @@ export const EntryEditor: React.FC<EntryEditorProps> = ({
         </TouchableOpacity>
       </View>
 
-      <GooglePlacesAutocomplete
-        placeholder="Tag location"
-        query={{ key: 'YOUR_GOOGLE_API_KEY', language: 'en' }}
-        fetchDetails
-        onPress={(data) => {
-          setPlaceId(data.place_id);
-          setLocationText(data.description);
-        }}
-        textInputProps={{
-          value: locationText,
-          onChangeText: setLocationText,
-        }}
-        styles={{ textInput: styles.input }}
-      />
-
-      <TextInput
-        placeholder="Title"
-        value={title}
-        onChangeText={setTitle}
-        style={styles.input}
-      />
-
-      <TextInput
-        placeholder="Content (markdown supported)"
-        value={body}
-        onChangeText={setBody}
-        style={[styles.input, { height: 120 }]}
-        multiline
-      />
-
-      {body.length > 0 && <Markdown style={styles.preview}>{body}</Markdown>}
-
-      <TouchableOpacity style={styles.mediaButton} onPress={pickMedia}>
-        <Text style={styles.mediaButtonText}>Add Photos/Videos</Text>
-      </TouchableOpacity>
-
       <FlatList
-        horizontal
-        data={media}
-        keyExtractor={(item, index) => item + index}
-        renderItem={({ item, index }) => (
-          <View style={styles.mediaItem}>
-            <Image source={{ uri: item }} style={styles.mediaThumb} />
-            <View style={styles.mediaActions}>
-              <TouchableOpacity
-                disabled={index === 0}
-                onPress={() => moveMedia(index, index - 1)}
-              >
-                <Ionicons name="arrow-back" size={20} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                disabled={index === media.length - 1}
-                onPress={() => moveMedia(index, index + 1)}
-              >
-                <Ionicons name="arrow-forward" size={20} />
-              </TouchableOpacity>
+        data={[]}
+        keyExtractor={() => 'content'}
+        renderItem={null}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          <View>
+            <GooglePlacesAutocomplete
+              placeholder="Tag location"
+              query={{ key: 'YOUR_GOOGLE_API_KEY', language: 'en' }}
+              fetchDetails
+              onPress={(data) => {
+                setPlaceId(data.place_id);
+                setLocationText(data.description);
+              }}
+              textInputProps={{
+                value: locationText,
+                onChangeText: setLocationText,
+              }}
+              styles={{ textInput: styles.input, listView: { zIndex: 10 } }}
+            />
+
+            <TextInput
+              placeholder="Title"
+              value={title}
+              onChangeText={setTitle}
+              style={styles.input}
+            />
+
+            <TextInput
+              placeholder="Content (markdown supported)"
+              value={body}
+              onChangeText={setBody}
+              style={[styles.input, styles.multiline]}
+              multiline
+            />
+
+            <TouchableOpacity style={styles.mediaButton} onPress={pickMedia}>
+              <Text style={styles.mediaButtonText}>Add Photos/Videos</Text>
+            </TouchableOpacity>
+
+            {media.length > 0 && (
+              <DraggableFlatList
+                horizontal
+                data={media}
+                keyExtractor={(item, index) => item + index}
+                renderItem={renderMediaItem}
+                onDragEnd={({ data }) => setMedia(data)}
+                contentContainerStyle={{ paddingVertical: 8 }}
+              />
+            )}
+
+            <View style={styles.statusCard}>
+              <View style={styles.statusHeader}>
+                <Text style={styles.statusLabel}>Status</Text>
+                <View style={styles.statusToggleRow}>
+                  <Switch
+                    value={status === 'published'}
+                    onValueChange={(v) => setStatus(v ? 'published' : 'draft')}
+                  />
+                  <Text style={styles.statusValue}>
+                    {status === 'published' ? 'Published' : 'Draft'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.statusDescription}>
+                {status === 'published'
+                  ? 'This entry will be published and visible to others'
+                  : 'This entry will be saved as a draft'}
+              </Text>
             </View>
           </View>
-        )}
+        }
+        contentContainerStyle={styles.listContent}
       />
-
-      <View style={styles.statusSection}>
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>Status</Text>
-          <Switch
-            value={status === 'published'}
-            onValueChange={(v) => setStatus(v ? 'published' : 'draft')}
-          />
-        </View>
-        <Text style={styles.statusText}>
-          {status === 'published'
-            ? 'This entry will be published and visible to others'
-            : 'This entry will be saved as a draft'}
-        </Text>
-      </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
+  wrapper: { flex: 1, backgroundColor: '#f9fafb' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    padding: 16,
   },
   headerButton: {
     fontSize: 16,
-    color: '#4f46e5',
+    color: '#2563eb',
   },
   saveButton: { fontWeight: '600' },
+  listContent: { padding: 16, paddingBottom: 32 },
   input: {
     backgroundColor: '#fff',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
     padding: 12,
     marginBottom: 12,
   },
-  preview: { marginBottom: 16 },
+  multiline: { height: 120, textAlignVertical: 'top' },
   mediaButton: {
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#2563eb',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -189,24 +204,43 @@ const styles = StyleSheet.create({
   mediaButtonText: { color: '#fff', fontWeight: '600' },
   mediaItem: {
     marginRight: 12,
-    alignItems: 'center',
-  },
-  mediaThumb: { width: 80, height: 80, borderRadius: 8 },
-  mediaActions: {
-    flexDirection: 'row',
-    marginTop: 4,
     width: 80,
-    justifyContent: 'space-between',
+    height: 80,
   },
-  statusSection: { marginTop: 16 },
-  switchRow: {
+  mediaThumb: { width: '100%', height: '100%', borderRadius: 8 },
+  deleteBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#00000099',
+    borderRadius: 10,
+    padding: 2,
+  },
+  statusCard: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
+  },
+  statusHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  label: { fontSize: 16 },
-  statusText: { color: '#6b7280', fontSize: 14 },
+  statusLabel: { fontSize: 16, fontWeight: '500' },
+  statusToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusValue: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#374151',
+  },
+  statusDescription: {
+    color: '#6b7280',
+    fontSize: 14,
+  },
 });
 
 export default EntryEditor;
