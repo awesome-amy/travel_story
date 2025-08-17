@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { ArrowLeft, Edit, Trash2, BookOpen, Camera, Video } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, BookOpen, Camera, Video, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Entry, Place } from '../types';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
@@ -14,6 +14,44 @@ interface EntryDetailProps {
 }
 
 export function EntryDetail({ entry, place, onBack, onEdit, onDelete }: EntryDetailProps) {
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const handlePhotoClick = (index: number) => {
+    setViewerIndex(index);
+  };
+
+  const handleCloseViewer = () => setViewerIndex(null);
+
+  const handleNext = () => {
+    if (entry.mediaUrls) {
+      setViewerIndex((prev) =>
+        prev === null ? null : (prev + 1) % entry.mediaUrls.length
+      );
+    }
+  };
+
+  const handlePrev = () => {
+    if (entry.mediaUrls) {
+      setViewerIndex((prev) =>
+        prev === null
+          ? null
+          : (prev - 1 + entry.mediaUrls.length) % entry.mediaUrls.length
+      );
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const endX = e.changedTouches[0].clientX;
+    if (touchStartX - endX > 50) handleNext();
+    if (endX - touchStartX > 50) handlePrev();
+    setTouchStartX(null);
+  };
   const getEntryIcon = (type: string) => {
     switch (type) {
       case 'blog': return <BookOpen className="w-5 h-5" />;
@@ -126,7 +164,11 @@ export function EntryDetail({ entry, place, onBack, onEdit, onDelete }: EntryDet
               {entry.type === 'album' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {entry.mediaUrls.map((url, index) => (
-                    <div key={index} className="aspect-video rounded-lg overflow-hidden">
+                    <div
+                      key={index}
+                      className="aspect-video rounded-lg overflow-hidden cursor-pointer"
+                      onClick={() => handlePhotoClick(index)}
+                    >
                       <ImageWithFallback
                         src={url}
                         alt={`${entry.title} - Image ${index + 1}`}
@@ -155,6 +197,44 @@ export function EntryDetail({ entry, place, onBack, onEdit, onDelete }: EntryDet
           )}
         </div>
       </div>
+    </div>
+      {viewerIndex !== null && entry.mediaUrls && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white"
+            onClick={handleCloseViewer}
+          >
+            <X className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute left-4 text-white"
+            onClick={handlePrev}
+          >
+            <ChevronLeft className="w-6 h-6" />
+          </Button>
+          <img
+            src={entry.mediaUrls[viewerIndex]}
+            alt={`Photo ${viewerIndex + 1}`}
+            className="max-h-full max-w-full object-contain"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 text-white"
+            onClick={handleNext}
+          >
+            <ChevronRight className="w-6 h-6" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,11 +16,18 @@ type Screen = 'home' | 'places' | 'map' | 'place-detail' | 'entry-editor' | 'dra
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('home');
-  const [places, setPlaces] = useState<Place[]>(mockPlaces);
+  const [places, setPlaces] = useState<Place[]>(recalcPlaceCounts(mockPlaces, mockEntries));
   const [entries, setEntries] = useState<Entry[]>(mockEntries);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<Entry | null>(null);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+
+  const recalcPlaceCounts = (placesList: Place[], entriesList: Entry[]) =>
+    placesList.map(p => {
+      const published = entriesList.filter(e => e.placeId === p.id && e.status === 'published').length;
+      const drafts = entriesList.filter(e => e.placeId === p.id && e.status === 'draft').length;
+      return { ...p, entryCount: published, draftCount: drafts };
+    });
 
   // Computed values
   const draftEntries = useMemo(() => 
@@ -72,39 +79,95 @@ export default function App() {
 
   const handleEntryDelete = (entry: Entry) => {
     if (window.confirm('Are you sure you want to delete this entry? It will be moved to trash.')) {
-      setEntries(prev => prev.map(e => 
-        e.id === entry.id 
+      const updatedEntries = entries.map(e =>
+        e.id === entry.id
           ? { ...e, status: 'trashed' as const, deletedAt: new Date() }
           : e
-      ));
+      );
+      const updatedPlaces = recalcPlaceCounts(places, updatedEntries);
+      setEntries(updatedEntries);
+      setPlaces(updatedPlaces);
       toast.success('Entry moved to trash');
+
+      const place = updatedPlaces.find(p => p.id === entry.placeId);
+      if (place) {
+        setSelectedPlace(place);
+        setSelectedEntry(null);
+        setCurrentScreen('place-detail');
+      } else {
+        setSelectedPlace(null);
+        setSelectedEntry(null);
+        setCurrentScreen('home');
+      }
     }
   };
 
   const handleEntrySave = (entryData: Partial<Entry>) => {
-    if (editingEntry) {
-      // Update existing entry
-      setEntries(prev => prev.map(e => 
-        e.id === editingEntry.id 
-          ? { ...e, ...entryData }
-          : e
-      ));
-      toast.success('Entry updated');
-    } else {
-      // Create new entry
-      const newEntry: Entry = {
-        id: Date.now().toString(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        ...entryData as Required<Omit<Entry, 'id' | 'createdAt' | 'updatedAt'>>
-      };
-      setEntries(prev => [...prev, newEntry]);
-      
-      toast.success(entryData.status === 'published' ? 'Entry published' : 'Draft saved');
+    let updatedPlaces = [...places];
+
+    let placeId = entryData.placeId;
+    if (!placeId && entryData.location && entryData.country) {
+      const existing = updatedPlaces.find(
+        p => p.name === entryData.location && p.adminArea === entryData.country
+      );
+      if (existing) {
+        placeId = existing.id;
+      } else {
+        const newPlace: Place = {
+          id: Date.now().toString(),
+          name: entryData.location,
+          countryCode: entryData.country,
+          adminArea: entryData.country,
+          locality: entryData.location,
+          lat: 0,
+          lon: 0,
+          entryCount: 0,
+          draftCount: 0,
+        };
+        updatedPlaces = [...updatedPlaces, newPlace];
+        placeId = newPlace.id;
+      }
     }
-    
-    setCurrentScreen('home');
+
+    const baseEntry = editingEntry
+      ? { ...editingEntry }
+      : { id: Date.now().toString(), createdAt: new Date() };
+
+    const entryToSave: Entry = {
+      ...baseEntry,
+      ...entryData,
+      placeId,
+      updatedAt: new Date(),
+    } as Entry;
+
+    let updatedEntries: Entry[];
+    if (editingEntry) {
+      updatedEntries = entries.map(e => (e.id === editingEntry.id ? entryToSave : e));
+    } else {
+      updatedEntries = [...entries, entryToSave];
+    }
+
+    updatedPlaces = recalcPlaceCounts(updatedPlaces, updatedEntries);
+
+    setEntries(updatedEntries);
+    setPlaces(updatedPlaces);
+
+    toast.success(entryToSave.status === 'published' ? 'Entry published' : editingEntry ? 'Entry updated' : 'Draft saved');
+
     setEditingEntry(null);
+
+    if (entryToSave.status === 'published') {
+      setSelectedEntry(entryToSave);
+      const place = updatedPlaces.find(p => p.id === entryToSave.placeId) || null;
+      setSelectedPlace(place);
+      setCurrentScreen('entry-detail');
+    } else if (entryToSave.placeId) {
+      const place = updatedPlaces.find(p => p.id === entryToSave.placeId) || null;
+      setSelectedPlace(place);
+      setCurrentScreen('place-detail');
+    } else {
+      setCurrentScreen('home');
+    }
   };
 
   const handleDraftEdit = (draft: Entry) => {
@@ -113,17 +176,23 @@ export default function App() {
   };
 
   const handleEntryRestore = (entry: Entry) => {
-    setEntries(prev => prev.map(e => 
-      e.id === entry.id 
+    const updatedEntries = entries.map(e =>
+      e.id === entry.id
         ? { ...e, status: 'draft' as const, deletedAt: undefined }
         : e
-    ));
+    );
+    const updatedPlaces = recalcPlaceCounts(places, updatedEntries);
+    setEntries(updatedEntries);
+    setPlaces(updatedPlaces);
     toast.success('Entry restored to drafts');
   };
 
   const handleEntryPermanentDelete = (entry: Entry) => {
     if (window.confirm('Are you sure? This will permanently delete the entry and cannot be undone.')) {
-      setEntries(prev => prev.filter(e => e.id !== entry.id));
+      const updatedEntries = entries.filter(e => e.id !== entry.id);
+      const updatedPlaces = recalcPlaceCounts(places, updatedEntries);
+      setEntries(updatedEntries);
+      setPlaces(updatedPlaces);
       toast.success('Entry permanently deleted');
     }
   };
